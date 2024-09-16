@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Результаты анализа</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f8f9fa;
+            padding-bottom: 2rem;
+        }
+
+        .container {
+            max-width: 900px;
+        }
+
+        .card {
+            border: none;
+            border-radius: 15px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            margin-bottom: 2rem;
+        }
+
+        .card-header {
+            background-color: #007bff;
+            color: white;
+            border-radius: 15px 15px 0 0 !important;
+            padding: 1rem;
+        }
+
+        .card-body {
+            padding: 1.5rem;
+        }
+
+        h1 {
+            color: #007bff;
+            font-weight: bold;
+            margin-bottom: 1.5rem;
+        }
+
+        .collapsible {
+            cursor: pointer;
+            padding: 12px;
+            width: 100%;
+            border: none;
+            text-align: left;
+            outline: none;
+            font-size: 16px;
+            background-color: #f1f1f1;
+            margin-bottom: 10px;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+        }
+
+        .active,
+        .collapsible:hover {
+            background-color: #e2e6ea;
+        }
+
+        .content {
+            padding: 0 18px;
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out;
+            background-color: #f8f9fa;
+            border-radius: 0 0 8px 8px;
+        }
+
+        .content.show {
+            max-height: 1000px;
+        }
+
+        .btn-primary {
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .spinner-border {
+            width: 1.5rem;
+            height: 1.5rem;
+            vertical-align: middle;
+            margin-left: 10px;
+        }
+
+        .loading {
+            display: none;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container mt-5">
+        <h1 class="text-center mb-4">
+            <i class="fas fa-chart-line"></i> Результаты анализа веб-страницы
+        </h1>
+        {% if error_message %}
+        <div class="alert alert-danger" role="alert">
+            {{ error_message }}
+        </div>
+        {% endif %}
+
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Анализ для сайта: {{ url }}</h5>
+            </div>
+            <div class="card-body">
+                <ul class="list-group list-group-flush">
+                    <li class="list-group-item">
+                        <i class="fas fa-clock"></i> <strong>Время загрузки страницы:</strong> {{ load_time }} секунд
+                    </li>
+                    <li class="list-group-item">
+                        <i class="fas fa-server"></i> <strong>DNS информация:</strong>
+                        <ul>
+                            {% if dns_info %}
+                            {% for ip in dns_info %}
+                            <li>{{ ip }}</li>
+                            {% endfor %}
+                            {% else %}
+                            <li>Не удалось получить DNS информацию</li>
+                            {% endif %}
+                        </ul>
+                    </li>
+                    <li class="list-group-item">
+                        <i class="fas fa-lock"></i> <strong>SSL сертификат:</strong>
+                        <ul>
+                            <li><strong>Статус:</strong> {{ ssl_info.validity_status }}</li>
+                            <li><strong>Дата начала:</strong> {{ ssl_info.not_before }}</li>
+                            <li><strong>Дата окончания:</strong> {{ ssl_info.not_after }}</li>
+                            <li><strong>Серийный номер:</strong> {{ ssl_info.serial_number }}</li>
+                        </ul>
+                    </li>
+                    <li class="list-group-item">
+                        <i class="fas fa-network-wired"></i> <strong>Доступность (Ping):</strong>
+                        <span id="pingResult">Нажмите кнопку для выполнения пинга</span>
+                        <div id="pingStatus" class="mt-2"></div>
+                        <div class="loading" id="pingLoading">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                        </div>
+                    </li>
+                    <li class="list-group-item">
+                        <i class="fas fa-door-open"></i> <strong>Результаты сканирования портов:</strong>
+                        <span id="scanResult">Нажмите кнопку для выполнения сканирования портов</span>
+                        <div id="scanStatus" class="mt-2"></div>
+                        <div class="loading" id="scanLoading">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                        </div>
+                    </li>
+                </ul>
+                <div class="text-center mt-4">
+                    <button id="pingButton" class="btn btn-primary me-2">
+                        <i class="fas fa-network-wired"></i> Выполнить Ping
+                    </button>
+                    <button id="scanButton" class="btn btn-primary">
+                        <i class="fas fa-search"></i> Сканировать порты
+                    </button>
+                </div>
+                <div class="text-center mt-4">
+                    <a href="javascript:history.back()" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left"></i> Назад
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            function executePing() {
+                console.log("Ping button clicked");
+                const host = "{{ url.replace('http://', '').replace('https://', '') }}";
+                console.log("Ping host:", host);
+                document.getElementById("pingLoading").style.display = "block";
+                fetch("/ping", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({ host: host }),
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        console.log("Ping response data:", data);
+                        document.getElementById("pingResult").innerHTML = formatPingResult(data.results);
+                        document.getElementById("pingStatus").innerText = data.status || "Статус неизвестен";
+                        document.getElementById("pingLoading").style.display = "none";
+                    })
+                    .catch(error => {
+                        console.error("Ping error:", error);
+                        document.getElementById("pingResult").innerText = "Ошибка при выполнении ping.";
+                        document.getElementById("pingLoading").style.display = "none";
+                    });
+            }
+
+            function executeScan() {
+                console.log("Scan button clicked");
+                const host = "{{ url.replace('http://', '').replace('https://', '') }}";
+                console.log("Scan host:", host);
+                document.getElementById("scanLoading").style.display = "block";
+                fetch("/scan", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({ host: host }),
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        console.log("Scan response data:", data);
+                        let result = data.result || "Нет данных";
+                        document.getElementById("scanResult").innerHTML = formatScanResult(result);
+                        document.getElementById("scanStatus").innerText = data.status || "Статус неизвестен";
+                        document.getElementById("scanLoading").style.display = "none";
+                    })
+                    .catch(error => {
+                        console.error("Scan error:", error);
+                        document.getElementById("scanResult").innerText = "Ошибка при выполнении сканирования.";
+                        document.getElementById("scanLoading").style.display = "none";
+                    });
+            }
+
+            function formatPingResult(results) {
+                let html = "";
+                for (const ip in results) {
+                    const result = results[ip];
+                    html += `\
+                        <button class="collapsible"><strong>${ip}:</strong> ${result.status}</button>\
+                        <div class="content">\
+                            <p>${result.output}</p>\
+                        </div>\
+                    `;
+                }
+                return html;
+            }
+
+            function formatScanResult(result) {
+                if (typeof result === 'string') {
+                    return `<div class="alert alert-danger">${result}</div>`;
+                }
+
+                let html = "";
+                for (const ip in result) {
+                    html += `<h5>${ip}</h5>`;
+                    html += `<table class="table table-bordered"><thead><tr><th>Порт</th><th>Имя</th><th>Состояние</th></tr></thead><tbody>`;
+                    result[ip].forEach(item => {
+                        html += `<tr><td>${item.port}</td><td>${item.name}</td><td>${item.state}</td></tr>`;
+                    });
+                    html += `</tbody></table>`;
+                }
+                return html;
+            }
+
+            document.getElementById('pingButton').addEventListener('click', executePing);
+            document.getElementById('scanButton').addEventListener('click', executeScan);
+            document.addEventListener('click', function (event) {
+                if (event.target.classList.contains('collapsible')) {
+                    const allContents = document.querySelectorAll('.content');
+                    allContents.forEach(content => {
+                        if (content !== event.target.nextElementSibling) {
+                            content.classList.remove('show');
+                        }
+                    });
+
+                    const allCollapsibles = document.querySelectorAll('.collapsible');
+                    allCollapsibles.forEach(collapsible => {
+                        if (collapsible !== event.target) {
+                            collapsible.classList.remove('active');
+                        }
+                    });
+
+                    event.target.classList.toggle('active');
+                    var content = event.target.nextElementSibling;
+                    content.classList.toggle('show');
+                }
+            });
+        });
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+
+</html>
