@@ -220,10 +220,8 @@ def ping():
 
 def get_port_name(port):
     try:
-        # Attempt to get the service name for the given port
         return socket.getservbyport(port)
     except OSError:
-        # If no standard service name exists for the port, return "unknown"
         return "unknown"
 
 
@@ -234,12 +232,10 @@ def fetch_scan_result(ip, ports="1-1024", max_threads=100):
     def scan_port(port):
         try:
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            sock.settimeout(1)  # Reduced timeout to speed up scanning
+            sock.settimeout(1)
             result = sock.connect_ex((ip, port))
             sock.close()
-            # Get the port name
             port_name = get_port_name(port)
-            # Only return the port result if the name is not "unknown"
             if port_name != "unknown":
                 return {
                     "port": port,
@@ -247,11 +243,9 @@ def fetch_scan_result(ip, ports="1-1024", max_threads=100):
                     "state": "open" if result == 0 else "closed",
                 }
             else:
-                # Skip adding this port to the result if the name is "unknown"
                 return None
         except Exception as e:
             logger.error(f"Error scanning port {port} on {ip}: {e}")
-            # Only include the port in the result if its name is not "unknown"
             port_name = get_port_name(port)
             if port_name != "unknown":
                 return {"port": port, "name": port_name, "state": "error"}
@@ -259,19 +253,16 @@ def fetch_scan_result(ip, ports="1-1024", max_threads=100):
                 return None
 
     try:
-        # Split ports and create a list of ports to scan
         ports_to_scan = ports.split(",")
         all_ports = []
 
         for port_range in ports_to_scan:
-            # Check if the element is a range of ports (e.g., "1-1024")
             if "-" in port_range:
                 start_port, end_port = map(int, port_range.split("-"))
                 all_ports.extend(range(start_port, end_port + 1))
             else:
                 all_ports.append(int(port_range))
 
-        # Use ThreadPoolExecutor to scan ports concurrently
         with ThreadPoolExecutor(max_workers=max_threads) as executor:
             future_to_port = {
                 executor.submit(scan_port, port): port for port in all_ports
@@ -279,14 +270,13 @@ def fetch_scan_result(ip, ports="1-1024", max_threads=100):
             for future in as_completed(future_to_port):
                 try:
                     port_result = future.result()
-                    # Only append the result if it's not None
+
                     if port_result is not None:
                         scan_result[ip].append(port_result)
                 except Exception as e:
                     logger.error(
                         f"Error retrieving scan result for port {future_to_port[future]}: {e}"
                     )
-                    # Handle errors but skip ports with "unknown" names
                     port_name = get_port_name(future_to_port[future])
                     if port_name != "unknown":
                         scan_result[ip].append(

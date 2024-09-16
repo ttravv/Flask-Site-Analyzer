@@ -15,7 +15,6 @@
         .alert-dismissible .btn-close {
             position: absolute;
             top: 0;
-            end: 0;
             padding: 0.75rem 1.25rem;
             background: transparent;
             border: 0;
@@ -57,7 +56,7 @@
                 const alert = document.getElementById('errorMessage');
                 if (alert) {
                     alert.classList.remove('show');
-                    setTimeout(() => alert.remove(), 150); // Удаляем элемент через короткую задержку, чтобы анимация исчезновения была завершена
+                    setTimeout(() => alert.remove(), 150);
                 }
             });
         });
